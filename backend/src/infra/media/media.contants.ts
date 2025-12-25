@@ -5,3 +5,6 @@ export const DEFAULT_UPLOAD_MAX_PARTS = '60';
 
 export const ALLOWED_IMAGE_MIMETYPES = 'image/jpeg,image/png,image/webp';
 export const ALLOWED_ARCHIVE_MIMETYPES = 'application/zip';
+
+export const MEDIA_SERVICE = 'MEDIA_SERVICE';
+export const MEDIA_PROVIDER_DEFAULT = 'cloudinary';

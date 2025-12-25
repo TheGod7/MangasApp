@@ -16,7 +16,6 @@ export const CloudinaryProvider = {
       throw new Error('Cloudinary configuration is missing');
     }
 
-    console.log(cloudinaryConfig);
     return v2.config(cloudinaryConfig);
   },
   inject: [ConfigService],

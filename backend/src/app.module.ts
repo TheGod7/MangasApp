@@ -11,7 +11,7 @@ import { MediaModule } from './infra/media/media.module';
       envFilePath: ['.env', '../.env'],
     }),
     DatabaseModule,
-    MediaModule,
+    MediaModule.forRootAsync(),
   ],
 })
 export class AppModule {}

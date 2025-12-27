@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { CLOUDINARY } from './constants/cloudinary.constants';
 import { ConfigOptions, v2 } from 'cloudinary';
+import { CLOUDINARY_ERRORS } from './constants/cloudinary.errors';
 
 export const CloudinaryProvider = {
   provide: CLOUDINARY,
@@ -13,7 +14,7 @@ export const CloudinaryProvider = {
       !cloudinaryConfig.api_key ||
       !cloudinaryConfig.api_secret
     ) {
-      throw new Error('Cloudinary configuration is missing');
+      throw new Error(CLOUDINARY_ERRORS.CONFIG_MISSING);
     }
 
     return v2.config(cloudinaryConfig);

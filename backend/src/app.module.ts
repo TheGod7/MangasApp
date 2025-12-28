@@ -8,7 +8,12 @@ import { MediaModule } from './infra/media/media.module';
     ConfigModule.forRoot({
       isGlobal: true,
       expandVariables: true,
-      envFilePath: ['.env', '../.env'],
+      envFilePath: [
+        `.env.${process.env.NODE_ENV}.local`,
+        `.env.${process.env.NODE_ENV}`,
+        '.env.local',
+        '.env',
+      ],
     }),
     DatabaseModule,
     MediaModule.forRootAsync(),

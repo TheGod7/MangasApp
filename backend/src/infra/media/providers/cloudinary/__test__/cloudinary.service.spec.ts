@@ -4,11 +4,13 @@ import { CLOUDINARY } from '../constants/cloudinary.constants';
 import { Readable } from 'stream';
 
 import { CLOUDINARY_ERRORS } from '../constants/cloudinary.errors';
-import { createFile } from './mocks/file.mocks';
+
 import {
   CreateUploadStreamMock,
   mockCloudinary,
 } from './mocks/cloudinary.mock';
+import { createUnitTestFile } from '@media/__test__/mocks/test-file.helpers';
+
 describe('CloudinaryService', () => {
   let service: CloudinaryService;
 
@@ -34,7 +36,7 @@ describe('CloudinaryService', () => {
 
   describe('upload', () => {
     it('Should upload a file to cloudinary', async () => {
-      const file = createFile({ filename: 'test.jpg' });
+      const file = createUnitTestFile({ filename: 'test.jpg' });
       const url = await service.upload(file);
 
       expect(url).toBe('https://example.com/image.jpg');
@@ -46,7 +48,7 @@ describe('CloudinaryService', () => {
         ErrorOnUpload: true,
       });
 
-      const file = createFile({ filename: 'test.jpg' });
+      const file = createUnitTestFile({ filename: 'test.jpg' });
 
       const uploadPromise = service.upload(file);
 
@@ -56,7 +58,7 @@ describe('CloudinaryService', () => {
     it('should throw if no secure_url is returned', async () => {
       mockCloudinary.uploader.upload_stream = CreateUploadStreamMock({});
 
-      const file = createFile({ filename: 'test.jpg' });
+      const file = createUnitTestFile({ filename: 'test.jpg' });
       const uploadPromise = service.upload(file);
 
       await expect(uploadPromise).rejects.toThrow(
@@ -65,7 +67,7 @@ describe('CloudinaryService', () => {
     });
 
     it('should throw if file buffer is empty', async () => {
-      const file = createFile({ buffer: Buffer.from('') });
+      const file = createUnitTestFile({ buffer: Buffer.from('') });
 
       const uploadPromise = service.upload(file);
 
@@ -79,7 +81,7 @@ describe('CloudinaryService', () => {
         ErrorOnpipe: true,
       });
 
-      const file = createFile({ buffer: Buffer.from('test') });
+      const file = createUnitTestFile({ buffer: Buffer.from('test') });
 
       jest.spyOn(Readable, 'from').mockImplementationOnce((buffer) => {
         const readable = Readable.from(buffer);

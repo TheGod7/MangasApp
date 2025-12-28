@@ -10,7 +10,21 @@ const extToMime: Record<string, string> = {
   zip: 'application/zip',
 };
 
-export const createMulterFileMock = (fileName: string): Express.Multer.File => {
+/** Unit test: archivo ficticio rápido */
+const createUnitTestFile = (
+  overrides: Partial<Express.Multer.File> = {},
+): Express.Multer.File =>
+  ({
+    fieldname: 'file',
+    originalname: 'test.jpg',
+    filename: 'test',
+    mimetype: 'image/jpeg',
+    buffer: Buffer.from('test'),
+    ...overrides,
+  }) as Express.Multer.File;
+
+/** Integration test: archivo real de resources */
+const createIntegrationTestFile = (fileName: string): Express.Multer.File => {
   const filePath = path.join(__dirname, '..', 'resources', fileName);
   const fileBuffer = fs.readFileSync(filePath);
 
@@ -21,12 +35,14 @@ export const createMulterFileMock = (fileName: string): Express.Multer.File => {
     fieldname: 'file',
     originalname: fileName,
     encoding: '7bit',
+    filename: fileName.split('.')[0],
     mimetype: mimeType,
     size: fileBuffer.length,
     buffer: fileBuffer,
     destination: '',
-    filename: fileName,
     path: filePath,
     stream: Readable.from(fileBuffer),
   };
 };
+
+export { createUnitTestFile, createIntegrationTestFile };

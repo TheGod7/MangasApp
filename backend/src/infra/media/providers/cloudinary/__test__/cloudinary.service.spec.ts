@@ -1,43 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CloudinaryService } from '../cloudinary.service';
 import { CLOUDINARY } from '../constants/cloudinary.constants';
-import { Readable, Writable } from 'stream';
-import { CLOUDINARY_ERRORS } from '../constants/cloudinary.errors';
+import { Readable } from 'stream';
 
+import { CLOUDINARY_ERRORS } from '../constants/cloudinary.errors';
+import { createFile } from './mocks/file.mocks';
+import {
+  CreateUploadStreamMock,
+  mockCloudinary,
+} from './mocks/cloudinary.mock';
 describe('CloudinaryService', () => {
   let service: CloudinaryService;
-
-  const createFile = (
-    overrides: Partial<Express.Multer.File> = {},
-  ): Express.Multer.File =>
-    ({
-      fieldname: 'file',
-      originalname: 'test.jpg',
-      filename: 'test',
-      mimetype: 'image/jpeg',
-      buffer: Buffer.from('test'),
-      ...overrides,
-    }) as Express.Multer.File;
-
-  const mockCloudinary = {
-    uploader: {
-      upload_stream: jest.fn(
-        (_options, cloudinaryCallback: (err: any, result: any) => void) => {
-          return new Writable({
-            write(_chunk, _encoding, done) {
-              cloudinaryCallback(null, {
-                secure_url: 'https://example.com/image.jpg',
-              });
-
-              done();
-            },
-          });
-        },
-      ),
-      destroy: jest.fn(),
-    },
-    url: jest.fn(),
-  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -55,6 +28,10 @@ describe('CloudinaryService', () => {
     service = module.get<CloudinaryService>(CloudinaryService);
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   describe('upload', () => {
     it('Should upload a file to cloudinary', async () => {
       const file = createFile({ filename: 'test.jpg' });
@@ -65,16 +42,9 @@ describe('CloudinaryService', () => {
     });
 
     it('should throw if cloudinary upload fails', async () => {
-      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
-        (_options, callback) => {
-          return new Writable({
-            write(_chunk, _encoding, done) {
-              callback(new Error(CLOUDINARY_ERRORS.TEST_ERROR), null);
-              done();
-            },
-          });
-        },
-      );
+      mockCloudinary.uploader.upload_stream = CreateUploadStreamMock({
+        ErrorOnUpload: true,
+      });
 
       const file = createFile({ filename: 'test.jpg' });
 
@@ -84,16 +54,7 @@ describe('CloudinaryService', () => {
     });
 
     it('should throw if no secure_url is returned', async () => {
-      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
-        (_options, callback) => {
-          return new Writable({
-            write(_chunk, _encoding, done) {
-              callback(null, { secure_url: null });
-              done();
-            },
-          });
-        },
-      );
+      mockCloudinary.uploader.upload_stream = CreateUploadStreamMock({});
 
       const file = createFile({ filename: 'test.jpg' });
       const uploadPromise = service.upload(file);
@@ -114,43 +75,23 @@ describe('CloudinaryService', () => {
     });
 
     it('should reject if the readable stream emits an error (pipe error)', async () => {
-      mockCloudinary.uploader.upload_stream.mockImplementationOnce(() => {
-        const writable = new Writable({
-          write(_chunk, _encoding, done) {
-            done();
-          },
-        });
-
-        writable.on('pipe', (src: Readable) => {
-          src.on('error', (err: Error) => {
-            writable.emit('error', err);
-          });
-        });
-
-        return writable;
+      mockCloudinary.uploader.upload_stream = CreateUploadStreamMock({
+        ErrorOnpipe: true,
       });
 
-      const file = createFile();
+      const file = createFile({ buffer: Buffer.from('test') });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      const originalFrom = Readable.from;
-
-      const fromSpy = jest
-        .spyOn(Readable, 'from')
-        .mockImplementationOnce((buffer) => {
-          const readable = originalFrom(buffer);
-
-          process.nextTick(() =>
-            readable.emit('error', new Error(CLOUDINARY_ERRORS.TEST_ERROR)),
-          );
-          return readable;
-        });
+      jest.spyOn(Readable, 'from').mockImplementationOnce((buffer) => {
+        const readable = Readable.from(buffer);
+        process.nextTick(() =>
+          readable.emit('error', new Error(CLOUDINARY_ERRORS.TEST_ERROR)),
+        );
+        return readable;
+      });
 
       await expect(service.upload(file)).rejects.toThrow(
         CLOUDINARY_ERRORS.TEST_ERROR,
       );
-
-      fromSpy.mockRestore();
     });
   });
 });

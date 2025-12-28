@@ -96,4 +96,56 @@ describe('CloudinaryService', () => {
       );
     });
   });
+
+  describe('uploadMany', () => {
+    it('should upload multiple files successfully', async () => {
+      const files = [
+        createUnitTestFile({ filename: 'test1.jpg', buffer: Buffer.from('a') }),
+        createUnitTestFile({ filename: 'test2.jpg', buffer: Buffer.from('b') }),
+      ];
+
+      const urls = [
+        'https://example.com/test1.jpg',
+        'https://example.com/test2.jpg',
+      ];
+
+      mockCloudinary.uploader.upload_stream = CreateUploadStreamMock({
+        Urls: urls,
+        MultipleUploads: true,
+      });
+
+      const result = await service.uploadMany(files);
+
+      expect(result).toEqual(urls);
+      expect(mockCloudinary.uploader.upload_stream).toHaveBeenCalled();
+    });
+
+    it('should throw if one of the uploads fail', async () => {
+      const files = [
+        createUnitTestFile({ filename: 'test1.jpg', buffer: Buffer.from('a') }),
+        createUnitTestFile({ filename: 'test2.jpg', buffer: Buffer.from('b') }),
+      ];
+
+      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
+        CreateUploadStreamMock({
+          secureUrl: 'https://example.com/test1.jpg',
+        }),
+      );
+
+      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
+        CreateUploadStreamMock({
+          ErrorOnUpload: true,
+        }),
+      );
+
+      const uploadPromise = service.uploadMany(files);
+
+      await expect(uploadPromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
+    });
+
+    it('should return empty array when no files are provided', async () => {
+      const result = await service.uploadMany([]);
+      expect(result).toEqual([]);
+    });
+  });
 });

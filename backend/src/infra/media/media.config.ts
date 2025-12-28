@@ -8,7 +8,7 @@ import {
   DEFAULT_UPLOAD_MAX_FILES,
   DEFAULT_UPLOAD_MAX_FILE_SIZE_MB,
   DEFAULT_UPLOAD_MAX_PARTS,
-} from './media.contants';
+} from './media.constants';
 import { mediafileFilterFactory } from './file-filter.factory';
 
 const MB = 1024 * 1024;

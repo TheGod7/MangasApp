@@ -4,4 +4,5 @@ export const CLOUDINARY_ERRORS = {
   UPLOAD_FAILED: 'Failed to upload file to Cloudinary',
   NO_SECURE_URL: 'No secure URL found in Cloudinary response',
   TEST_ERROR: 'This is a test error for Cloudinary service',
+  TEST_PIPE_ERROR: 'This is a test pipe error for Cloudinary service',
 } as const;

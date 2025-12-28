@@ -4,7 +4,7 @@ import { CLOUDINARY } from '../constants/cloudinary.constants';
 import { Readable, Writable } from 'stream';
 import { CLOUDINARY_ERRORS } from '../constants/cloudinary.errors';
 
-describe('Upload method', () => {
+describe('CloudinaryService', () => {
   let service: CloudinaryService;
 
   const createFile = (
@@ -40,6 +40,8 @@ describe('Upload method', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CloudinaryService,
@@ -53,98 +55,186 @@ describe('Upload method', () => {
     service = module.get<CloudinaryService>(CloudinaryService);
   });
 
-  it('Should upload a file to cloudinary', async () => {
-    const file = createFile({ filename: 'test.jpg' });
-    const url = await service.upload(file);
+  describe('upload', () => {
+    it('Should upload a file to cloudinary', async () => {
+      const file = createFile({ filename: 'test.jpg' });
+      const url = await service.upload(file);
 
-    expect(url).toBe('https://example.com/image.jpg');
-    expect(mockCloudinary.uploader.upload_stream).toHaveBeenCalled();
-  });
-
-  it('should throw if cloudinary upload fails', async () => {
-    mockCloudinary.uploader.upload_stream.mockImplementationOnce(
-      (_options, callback) => {
-        return new Writable({
-          write(_chunk, _encoding, done) {
-            callback(new Error(CLOUDINARY_ERRORS.TEST_ERROR), null);
-            done();
-          },
-        });
-      },
-    );
-
-    const file = createFile({ filename: 'test.jpg' });
-
-    const uploadPromise = service.upload(file);
-
-    await expect(uploadPromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
-  });
-
-  it('should throw if no secure_url is returned', async () => {
-    mockCloudinary.uploader.upload_stream.mockImplementationOnce(
-      (_options, callback) => {
-        return new Writable({
-          write(_chunk, _encoding, done) {
-            callback(null, { secure_url: null });
-            done();
-          },
-        });
-      },
-    );
-
-    const file = createFile({ filename: 'test.jpg' });
-    const uploadPromise = service.upload(file);
-
-    await expect(uploadPromise).rejects.toThrow(
-      CLOUDINARY_ERRORS.NO_SECURE_URL,
-    );
-  });
-
-  it('should throw if file buffer is empty', async () => {
-    const file = createFile({ buffer: Buffer.from('') });
-
-    const uploadPromise = service.upload(file);
-
-    await expect(uploadPromise).rejects.toThrow(CLOUDINARY_ERRORS.BUFFER_EMPTY);
-  });
-
-  it('should reject if the readable stream emits an error (pipe error)', async () => {
-    mockCloudinary.uploader.upload_stream.mockImplementationOnce(() => {
-      const writable = new Writable({
-        write(_chunk, _encoding, done) {
-          done();
-        },
-      });
-
-      writable.on('pipe', (src: Readable) => {
-        src.on('error', (err: Error) => {
-          writable.emit('error', err);
-        });
-      });
-
-      return writable;
+      expect(url).toBe('https://example.com/image.jpg');
+      expect(mockCloudinary.uploader.upload_stream).toHaveBeenCalled();
     });
 
-    const file = createFile();
+    it('should throw if cloudinary upload fails', async () => {
+      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
+        (_options, callback) => {
+          return new Writable({
+            write(_chunk, _encoding, done) {
+              callback(new Error(CLOUDINARY_ERRORS.TEST_ERROR), null);
+              done();
+            },
+          });
+        },
+      );
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    const originalFrom = Readable.from;
+      const file = createFile({ filename: 'test.jpg' });
 
-    const fromSpy = jest
-      .spyOn(Readable, 'from')
-      .mockImplementationOnce((buffer) => {
-        const readable = originalFrom(buffer);
+      const uploadPromise = service.upload(file);
 
-        process.nextTick(() =>
-          readable.emit('error', new Error(CLOUDINARY_ERRORS.TEST_ERROR)),
-        );
-        return readable;
+      await expect(uploadPromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
+    });
+
+    it('should throw if no secure_url is returned', async () => {
+      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
+        (_options, callback) => {
+          return new Writable({
+            write(_chunk, _encoding, done) {
+              callback(null, { secure_url: null });
+              done();
+            },
+          });
+        },
+      );
+
+      const file = createFile({ filename: 'test.jpg' });
+      const uploadPromise = service.upload(file);
+
+      await expect(uploadPromise).rejects.toThrow(
+        CLOUDINARY_ERRORS.NO_SECURE_URL,
+      );
+    });
+
+    it('should throw if file buffer is empty', async () => {
+      const file = createFile({ buffer: Buffer.from('') });
+
+      const uploadPromise = service.upload(file);
+
+      await expect(uploadPromise).rejects.toThrow(
+        CLOUDINARY_ERRORS.BUFFER_EMPTY,
+      );
+    });
+
+    it('should reject if the readable stream emits an error (pipe error)', async () => {
+      mockCloudinary.uploader.upload_stream.mockImplementationOnce(() => {
+        const writable = new Writable({
+          write(_chunk, _encoding, done) {
+            done();
+          },
+        });
+
+        writable.on('pipe', (src: Readable) => {
+          src.on('error', (err: Error) => {
+            writable.emit('error', err);
+          });
+        });
+
+        return writable;
       });
 
-    await expect(service.upload(file)).rejects.toThrow(
-      CLOUDINARY_ERRORS.TEST_ERROR,
-    );
+      const file = createFile();
 
-    fromSpy.mockRestore();
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalFrom = Readable.from;
+
+      const fromSpy = jest
+        .spyOn(Readable, 'from')
+        .mockImplementationOnce((buffer) => {
+          const readable = originalFrom(buffer);
+
+          process.nextTick(() =>
+            readable.emit('error', new Error(CLOUDINARY_ERRORS.TEST_ERROR)),
+          );
+          return readable;
+        });
+
+      await expect(service.upload(file)).rejects.toThrow(
+        CLOUDINARY_ERRORS.TEST_ERROR,
+      );
+
+      fromSpy.mockRestore();
+    });
+  });
+
+  describe('uploadMany', () => {
+    afterEach(() => {
+      jest.clearAllMocks();
+      jest.restoreAllMocks();
+    });
+
+    it('should upload multiple files successfully', async () => {
+      const files = [
+        createFile({ filename: 'test1.jpg', buffer: Buffer.from('a') }),
+        createFile({ filename: 'test2.jpg', buffer: Buffer.from('b') }),
+      ];
+
+      const urls = [
+        'https://example.com/test1.jpg',
+        'https://example.com/test2.jpg',
+      ];
+      let callIndex = 0;
+
+      mockCloudinary.uploader.upload_stream.mockImplementation(
+        (_options, cb) => {
+          let called = false;
+          return new Writable({
+            write(_chunk, _encoding, done) {
+              done();
+            },
+            final(done) {
+              if (!called) {
+                cb(null, {
+                  secure_url: urls[callIndex++] ?? urls[urls.length - 1],
+                });
+                called = true;
+              }
+              done();
+            },
+          });
+        },
+      );
+
+      const result = await service.uploadMany(files);
+
+      expect(result).toEqual(urls);
+      expect(mockCloudinary.uploader.upload_stream).toHaveBeenCalled();
+    });
+
+    it('should throw if one of the uploads fail', async () => {
+      const files = [
+        createFile({ filename: 'test1.jpg', buffer: Buffer.from('a') }),
+        createFile({ filename: 'test2.jpg', buffer: Buffer.from('b') }),
+      ];
+
+      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
+        (_options, callback) => {
+          return new Writable({
+            write(_chunk, _encoding, done) {
+              callback(null, { secure_url: 'https://example.com/test1.jpg' });
+
+              done();
+            },
+          });
+        },
+      );
+
+      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
+        (_options, callback) => {
+          return new Writable({
+            write(_chunk, _encoding, done) {
+              callback(new Error(CLOUDINARY_ERRORS.TEST_ERROR), null);
+              done();
+            },
+          });
+        },
+      );
+
+      const uploadPromise = service.uploadMany(files);
+
+      await expect(uploadPromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
+    });
+
+    it('should return empty array when no files are provided', async () => {
+      const result = await service.uploadMany([]);
+      expect(result).toEqual([]);
+    });
   });
 });

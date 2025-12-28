@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CloudinaryService } from './cloudinary.service';
-import { CLOUDINARY } from './constants/cloudinary.constants';
+import { CloudinaryService } from '../cloudinary.service';
+import { CLOUDINARY } from '../constants/cloudinary.constants';
 import { Readable, Writable } from 'stream';
-import { CLOUDINARY_ERRORS } from './constants/cloudinary.errors';
+import { CLOUDINARY_ERRORS } from '../constants/cloudinary.errors';
 
 describe('Upload method', () => {
   let service: CloudinaryService;

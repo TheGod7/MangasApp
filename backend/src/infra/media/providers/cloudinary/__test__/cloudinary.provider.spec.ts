@@ -2,8 +2,8 @@ import { ConfigService } from '@nestjs/config';
 import { v2 } from 'cloudinary';
 import type { ConfigOptions } from 'cloudinary';
 
-import { CloudinaryProvider } from './cloudinary.provider';
-import { CLOUDINARY_ERRORS } from './constants/cloudinary.errors';
+import { CloudinaryProvider } from '../cloudinary.provider';
+import { CLOUDINARY_ERRORS } from '../constants/cloudinary.errors';
 
 jest.mock('cloudinary', () => ({
   v2: {

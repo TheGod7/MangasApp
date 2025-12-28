@@ -1,8 +1,9 @@
+import { BadRequestException } from '@nestjs/common';
 import { Request } from 'express';
 
-export const mediafileFilterFactory = (allowedMimetypes: string[]) => {
+export const mediaFileFilter = (allowedMimetypes: string[]) => {
   return (
-    req: Request,
+    _req: Request,
     file: Express.Multer.File,
     callback: (error: Error | null, acceptFile: boolean) => void,
   ) => {
@@ -10,10 +11,8 @@ export const mediafileFilterFactory = (allowedMimetypes: string[]) => {
       callback(null, true);
     } else {
       callback(
-        new Error(
-          `Invalid file type ${file.mimetype}. Allowed types are: ${allowedMimetypes.join(
-            ', ',
-          )}`,
+        new BadRequestException(
+          `Invalid file type ${file.mimetype}. Allowed types are: ${allowedMimetypes.join(', ')}`,
         ),
         false,
       );

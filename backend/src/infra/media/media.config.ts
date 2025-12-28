@@ -9,7 +9,7 @@ import {
   DEFAULT_UPLOAD_MAX_FILE_SIZE_MB,
   DEFAULT_UPLOAD_MAX_PARTS,
 } from './media.constants';
-import { mediafileFilterFactory } from './file-filter.factory';
+import { mediaFileFilter } from './media-file-filter';
 
 const MB = 1024 * 1024;
 
@@ -40,6 +40,6 @@ export const mediaConfig = registerAs('media', (): MulterOptions => {
         ) * MB,
       parts: parseInt(process.env.UPLOAD_MAX_PARTS || DEFAULT_UPLOAD_MAX_PARTS),
     },
-    fileFilter: mediafileFilterFactory(allowedMimetypes),
+    fileFilter: mediaFileFilter(allowedMimetypes),
   };
 });

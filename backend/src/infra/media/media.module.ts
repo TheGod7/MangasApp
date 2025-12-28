@@ -1,6 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { MEDIA_SERVICE, MEDIA_PROVIDER_DEFAULT } from './media.contants';
-import { MediaModuleType, MediaServiceType } from './media.types';
+import { MediaModuleType, MediaServiceType } from './types/media.types';
 
 @Module({
   imports: [],

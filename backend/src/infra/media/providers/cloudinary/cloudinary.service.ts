@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/require-await */
 
 import { Inject, Injectable } from '@nestjs/common';
-import { MediaService } from '../../media.interface';
+import { MediaService } from '../../types/media.interface';
 import { v2 } from 'cloudinary';
 import { Readable } from 'stream';
 import { CLOUDINARY } from './constants/cloudinary.constants';

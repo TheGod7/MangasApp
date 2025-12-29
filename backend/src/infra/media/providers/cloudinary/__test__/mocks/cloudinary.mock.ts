@@ -5,67 +5,62 @@ import {
   CreateUploadStreamMockOptions,
 } from '../../types/cloudinary.types';
 import { CLOUDINARY_ERRORS } from '../../constants/cloudinary.errors';
+import {
+  CLOUDINARY_DELETED,
+  CLOUDINARY_OK,
+  DEFOULT_PUBLICID,
+  JPG_EXT,
+  URL_PREFIX,
+} from './cloudinary.mock.constants';
 
 const CreateUploadStreamMock = (options: CreateUploadStreamMockOptions) => {
   let callIndex = 0;
+  const shouldGenerate = options.generateUrl !== false;
 
-  return jest.fn(
-    (
-      _optionsInner: any,
-      cloudinaryCallback: (err: any, result: any) => void,
-    ) => {
-      let called = false;
+  return jest.fn((_config: any, callback: (err: any, result: any) => void) => {
+    const writable = new Writable({
+      write(_chunk, _encoding, next) {
+        if (options.ErrorOnUpload) {
+          callback(new Error(CLOUDINARY_ERRORS.UPLOAD_FAILED), null);
+          return next();
+        }
 
-      const writable = new Writable({
-        write(_chunk, _encoding, done) {
-          if (options.ErrorOnUpload) {
-            cloudinaryCallback(new Error(), null);
-          }
+        if (options.ErrorOnPipe) return next();
 
-          if (
-            !options.ErrorOnUpload &&
-            !options.ErrorOnpipe &&
-            !options.MultipleUploads
-          ) {
-            cloudinaryCallback(null, {
-              secure_url: options.secureUrl,
-            });
-          }
+        const currentPublicId =
+          options.publicIds?.[callIndex] ??
+          options.publicId ??
+          DEFOULT_PUBLICID + callIndex;
 
-          done();
-        },
+        let finalUrl: string | undefined;
 
-        final(done) {
-          if (options.MultipleUploads && !called) {
-            cloudinaryCallback(null, {
-              secure_url:
-                options.Urls?.[callIndex++] ??
-                options.Urls?.[options.Urls.length - 1],
-            });
+        if (options.fixedUrl) {
+          finalUrl = options.fixedUrl;
+        } else if (shouldGenerate) {
+          finalUrl = URL_PREFIX + currentPublicId + JPG_EXT;
+        }
 
-            called = true;
-          }
+        const response = {
+          public_id: currentPublicId,
+          ...(finalUrl && { secure_url: finalUrl }),
+        };
 
-          done();
-        },
+        callback(null, response);
+        callIndex++;
+        next();
+      },
+    });
+
+    if (options.ErrorOnPipe) {
+      writable.on('pipe', (src: NodeJS.ReadableStream) => {
+        process.nextTick(() =>
+          src.emit('error', new Error(CLOUDINARY_ERRORS.UPLOAD_FAILED)),
+        );
       });
+    }
 
-      if (options.ErrorOnpipe) {
-        writable.on('pipe', (src: NodeJS.ReadableStream) => {
-          src.on('error', (err: Error) => {
-            cloudinaryCallback(err, null);
-            writable.emit('error', err);
-          });
-        });
-
-        writable.on('error', (err) => {
-          cloudinaryCallback(err, null);
-        });
-      }
-
-      return writable;
-    },
-  );
+    return writable;
+  });
 };
 
 const CreateDeleteResourcesMock = (
@@ -77,11 +72,11 @@ const CreateDeleteResourcesMock = (
         return Promise.reject(new Error(CLOUDINARY_ERRORS.DELETE_FAILED));
       }
 
-      const defaultStatus = options.defaultStatus ?? 'deleted';
+      const defaultStatus = options.defaultStatus ?? CLOUDINARY_DELETED;
 
-      const deleted = publicIds.reduce((acc, id) => {
-        const status = options.customStatuses?.[id] ?? defaultStatus;
-        return { ...acc, [id]: status };
+      const deleted = publicIds.reduce<Record<string, string>>((acc, id) => {
+        acc[id] = options.customStatuses?.[id] ?? defaultStatus;
+        return acc;
       }, {});
 
       return Promise.resolve({
@@ -94,11 +89,9 @@ const CreateDeleteResourcesMock = (
 
 const mockCloudinary = {
   uploader: {
-    upload_stream: CreateUploadStreamMock({
-      secureUrl: 'https://example.com/image.jpg',
-    }),
+    upload_stream: CreateUploadStreamMock({}),
     destroy: jest.fn((_id, callback: (err: any, result: any) => void) => {
-      callback(null, { result: 'ok' });
+      callback(null, { result: CLOUDINARY_OK });
     }),
   },
   api: {

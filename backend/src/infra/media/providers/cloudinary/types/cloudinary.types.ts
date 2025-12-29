@@ -8,11 +8,13 @@ interface CloudinaryAdminDeleteResponse {
 }
 
 interface CreateUploadStreamMockOptions {
-  secureUrl?: string | null;
-  Urls?: string[];
+  publicId?: string;
+  publicIds?: string[];
 
-  MultipleUploads?: boolean;
-  ErrorOnpipe?: boolean;
+  generateUrl?: boolean;
+  fixedUrl?: string;
+
+  ErrorOnPipe?: boolean;
   ErrorOnUpload?: boolean;
 }
 

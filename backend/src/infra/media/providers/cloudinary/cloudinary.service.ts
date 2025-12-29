@@ -1,11 +1,19 @@
 /* eslint-disable @typescript-eslint/require-await */
-
 import { Inject, Injectable } from '@nestjs/common';
-import { MediaService } from '../../types/media.interface';
-import { v2 } from 'cloudinary';
+import {
+  DeleteManyResult,
+  GetUrlsManyResult,
+  MediaService,
+  UploadManyResult,
+} from '@media/types/media.interface';
+import { v2, UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
 import { Readable } from 'stream';
 import { CLOUDINARY } from './constants/cloudinary.constants';
 import { CLOUDINARY_ERRORS } from './constants/cloudinary.errors';
+import {
+  CloudinaryAdminDeleteResponse,
+  CloudinaryDestroyResponse,
+} from './types/cloudinary.types';
 
 @Injectable()
 export class CloudinaryService implements MediaService {
@@ -18,51 +26,124 @@ export class CloudinaryService implements MediaService {
       }
 
       const uploadStream = this.cloudinary.uploader.upload_stream(
-        { resource_type: 'image' },
-        (error, result) => {
-          if (error) {
-            return reject(
-              new Error(
-                error instanceof Error
-                  ? error.message
-                  : CLOUDINARY_ERRORS.UPLOAD_FAILED,
-              ),
-            );
+        { resource_type: 'auto' },
+        (
+          error: UploadApiErrorResponse | undefined,
+          result: UploadApiResponse | undefined,
+        ) => {
+          if (error || !result) {
+            return reject(new Error(CLOUDINARY_ERRORS.UPLOAD_FAILED));
           }
-
-          if (!result?.secure_url) {
+          if (!result.secure_url) {
             return reject(new Error(CLOUDINARY_ERRORS.NO_SECURE_URL));
           }
-
           resolve(result.secure_url);
         },
       );
 
-      Readable.from(file.buffer)
-        .pipe(uploadStream)
-        .on('error', (err) => {
-          reject(err);
-        });
+      Readable.from(file.buffer).pipe(uploadStream);
     });
   }
 
-  async uploadMany(files: Express.Multer.File[]): Promise<string[]> {
-    return Promise.all(files.map((file) => this.upload(file)));
+  async uploadMany(files: Express.Multer.File[]): Promise<UploadManyResult> {
+    const successes: UploadManyResult['successes'] = [];
+    const failures: UploadManyResult['failures'] = [];
+
+    const uploadPromises = files.map(async (file) => {
+      try {
+        const url = await this.upload(file);
+        successes.push({ fileName: file.originalname, url });
+      } catch (err: unknown) {
+        const errorMessage =
+          err instanceof Error ? err.message : CLOUDINARY_ERRORS.UPLOAD_FAILED;
+        failures.push({ fileName: file.originalname, error: errorMessage });
+      }
+    });
+
+    await Promise.allSettled(uploadPromises);
+    return { successes, failures };
   }
 
   async delete(publicId: string): Promise<void> {
-    await this.cloudinary.uploader.destroy(publicId);
+    if (!publicId) throw new Error(CLOUDINARY_ERRORS.DELETE_FAILED);
+
+    return new Promise<void>((resolve, reject) => {
+      void this.cloudinary.uploader.destroy(
+        publicId,
+        (error: Error | undefined, result: CloudinaryDestroyResponse) => {
+          if (error || result.result !== 'ok') {
+            return reject(new Error(CLOUDINARY_ERRORS.DELETE_FAILED));
+          }
+          resolve();
+        },
+      );
+    });
   }
 
-  async deleteMany(publicIds: string[]): Promise<void> {
-    await Promise.all(publicIds.map((id) => this.delete(id)));
+  async deleteMany(publicIds: string[]): Promise<DeleteManyResult> {
+    if (!publicIds.length) return { successes: [], failures: [] };
+
+    try {
+      const result = (await this.cloudinary.api.delete_resources(
+        publicIds,
+      )) as CloudinaryAdminDeleteResponse;
+
+      const successes: DeleteManyResult['successes'] = [];
+      const failures: DeleteManyResult['failures'] = [];
+
+      for (const id of publicIds) {
+        const status = result.deleted[id];
+        if (status === 'deleted' || status === 'ok') {
+          successes.push({ publicId: id });
+        } else {
+          failures.push({
+            publicId: id,
+            error: status || 'not_found',
+          });
+        }
+      }
+
+      return { successes, failures };
+    } catch {
+      throw new Error(CLOUDINARY_ERRORS.DELETE_FAILED);
+    }
   }
 
   async getPublicUrl(publicId: string): Promise<string> {
-    return this.cloudinary.url(publicId, { secure: true });
+    if (!publicId) throw new Error(CLOUDINARY_ERRORS.GET_URL_FAILED);
+
+    const url = this.cloudinary.url(publicId, { secure: true });
+
+    if (!url) throw new Error(CLOUDINARY_ERRORS.GET_URL_FAILED);
+
+    return url;
   }
 
-  async getPublicUrlsMany(publicIds: string[]): Promise<string[]> {
-    return publicIds.map((id) => this.cloudinary.url(id, { secure: true }));
+  async getPublicUrlsMany(publicIds: string[]): Promise<GetUrlsManyResult> {
+    const successes: { publicId: string; url: string }[] = [];
+    const failures: { publicId: string; error: string }[] = [];
+
+    publicIds.forEach((id) => {
+      if (!id) {
+        failures.push({
+          publicId: id,
+          error: CLOUDINARY_ERRORS.GET_URL_FAILED,
+        });
+        return;
+      }
+
+      const url = this.cloudinary.url(id, { secure: true });
+
+      if (!url) {
+        failures.push({
+          publicId: id,
+          error: CLOUDINARY_ERRORS.GET_URL_FAILED,
+        });
+      } else {
+        successes.push({ publicId: id, url });
+      }
+    });
+
+    return { successes, failures };
   }
 }

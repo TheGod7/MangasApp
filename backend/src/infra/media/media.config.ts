@@ -1,5 +1,4 @@
 import { registerAs } from '@nestjs/config';
-import { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 import { memoryStorage } from 'multer';
 import {
   ALLOWED_ARCHIVE_MIMETYPES,
@@ -10,10 +9,11 @@ import {
   DEFAULT_UPLOAD_MAX_PARTS,
 } from './media.constants';
 import { mediaFileFilter } from './media-file-filter';
+import { MulterModuleOptions } from '@nestjs/platform-express';
 
 const MB = 1024 * 1024;
 
-export const mediaConfig = registerAs('media', (): MulterOptions => {
+export const mediaConfig = registerAs('media', (): MulterModuleOptions => {
   const IMAGE_MIMETYPES =
     process.env.ALLOWED_IMAGE_MIMETYPES || ALLOWED_IMAGE_MIMETYPES;
   const ARCHIVE_MIMETYPES =

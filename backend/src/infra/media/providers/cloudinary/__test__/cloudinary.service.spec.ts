@@ -230,4 +230,32 @@ describe('CloudinaryService', () => {
       );
     });
   });
+
+  describe('getPublicUrlsMany', () => {
+    const publicIds = ['public_id1', 'public_id2', 'public_id3'];
+
+    it('should return the public urls', async () => {
+      mockCloudinary.url.mockImplementation(
+        (id) => `https://example.com/${id}`,
+      );
+
+      const result = await service.getPublicUrlsMany(publicIds);
+
+      expect(result).toEqual(
+        publicIds.map((id) => `https://example.com/${id}`),
+      );
+    });
+
+    it('should throw if cloudinary url fails', async () => {
+      mockCloudinary.url.mockImplementation(() => {
+        throw new Error(CLOUDINARY_ERRORS.TEST_ERROR);
+      });
+
+      const getPublicUrlsManyPromise = service.getPublicUrlsMany(publicIds);
+
+      await expect(getPublicUrlsManyPromise).rejects.toThrow(
+        CLOUDINARY_ERRORS.TEST_ERROR,
+      );
+    });
+  });
 });

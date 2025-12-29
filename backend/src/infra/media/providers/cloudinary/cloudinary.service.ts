@@ -3,8 +3,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   DeleteManyResult,
   GetUrlsManyResult,
+  GetUrlSuccess,
   MediaService,
   UploadManyResult,
+  UploadSuccess,
 } from '@media/types/media.interface';
 import { v2, UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
 import { Readable } from 'stream';
@@ -19,7 +21,7 @@ import {
 export class CloudinaryService implements MediaService {
   constructor(@Inject(CLOUDINARY) private readonly cloudinary: typeof v2) {}
 
-  async upload(file: Express.Multer.File): Promise<string> {
+  async upload(file: Express.Multer.File): Promise<UploadSuccess> {
     return new Promise((resolve, reject) => {
       if (!file?.buffer || file.buffer.length === 0) {
         return reject(new Error(CLOUDINARY_ERRORS.BUFFER_EMPTY));
@@ -37,7 +39,11 @@ export class CloudinaryService implements MediaService {
           if (!result.secure_url) {
             return reject(new Error(CLOUDINARY_ERRORS.NO_SECURE_URL));
           }
-          resolve(result.secure_url);
+          resolve({
+            fileName: file.originalname,
+            url: result.secure_url,
+            publicId: result.public_id,
+          });
         },
       );
 
@@ -51,8 +57,8 @@ export class CloudinaryService implements MediaService {
 
     const uploadPromises = files.map(async (file) => {
       try {
-        const url = await this.upload(file);
-        successes.push({ fileName: file.originalname, url });
+        const success = await this.upload(file);
+        successes.push(success);
       } catch (err: unknown) {
         const errorMessage =
           err instanceof Error ? err.message : CLOUDINARY_ERRORS.UPLOAD_FAILED;
@@ -109,14 +115,14 @@ export class CloudinaryService implements MediaService {
     }
   }
 
-  async getPublicUrl(publicId: string): Promise<string> {
+  async getPublicUrl(publicId: string): Promise<GetUrlSuccess> {
     if (!publicId) throw new Error(CLOUDINARY_ERRORS.GET_URL_FAILED);
 
     const url = this.cloudinary.url(publicId, { secure: true });
 
     if (!url) throw new Error(CLOUDINARY_ERRORS.GET_URL_FAILED);
 
-    return url;
+    return { publicId, url };
   }
 
   async getPublicUrlsMany(publicIds: string[]): Promise<GetUrlsManyResult> {

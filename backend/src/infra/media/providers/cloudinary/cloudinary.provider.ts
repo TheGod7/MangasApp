@@ -17,7 +17,9 @@ export const CloudinaryProvider = {
       throw new Error(CLOUDINARY_ERRORS.CONFIG_MISSING);
     }
 
-    return v2.config(cloudinaryConfig);
+    v2.config(cloudinaryConfig);
+
+    return v2;
   },
   inject: [ConfigService],
 };

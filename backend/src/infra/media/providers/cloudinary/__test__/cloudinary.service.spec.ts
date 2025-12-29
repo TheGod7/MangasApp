@@ -6,16 +6,27 @@ import { Readable } from 'stream';
 import { CLOUDINARY_ERRORS } from '../constants/cloudinary.errors';
 
 import {
+  CreateDeleteResourcesMock,
   CreateUploadStreamMock,
   mockCloudinary,
 } from './mocks/cloudinary.mock';
 import { createUnitTestFile } from '@media/__test__/mocks/test-file.helpers';
+
+import {
+  expectUploadFailures,
+  expectUploadSuccesses,
+  mockFilesUpload,
+} from './helpers/clodinary.helper';
 
 describe('CloudinaryService', () => {
   let service: CloudinaryService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    mockCloudinary.uploader.upload_stream = CreateUploadStreamMock({
+      secureUrl: 'https://example.com/image.jpg',
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -52,7 +63,9 @@ describe('CloudinaryService', () => {
 
       const uploadPromise = service.upload(file);
 
-      await expect(uploadPromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
+      await expect(uploadPromise).rejects.toThrow(
+        CLOUDINARY_ERRORS.UPLOAD_FAILED,
+      );
     });
 
     it('should throw if no secure_url is returned', async () => {
@@ -85,177 +98,285 @@ describe('CloudinaryService', () => {
 
       jest.spyOn(Readable, 'from').mockImplementationOnce((buffer) => {
         const readable = Readable.from(buffer);
-        process.nextTick(() =>
-          readable.emit('error', new Error(CLOUDINARY_ERRORS.TEST_ERROR)),
-        );
+        process.nextTick(() => readable.emit('error', new Error()));
         return readable;
       });
 
       await expect(service.upload(file)).rejects.toThrow(
-        CLOUDINARY_ERRORS.TEST_ERROR,
+        CLOUDINARY_ERRORS.UPLOAD_FAILED,
       );
     });
   });
 
   describe('uploadMany', () => {
-    it('should upload multiple files successfully', async () => {
-      const files = [
-        createUnitTestFile({ filename: 'test1.jpg', buffer: Buffer.from('a') }),
-        createUnitTestFile({ filename: 'test2.jpg', buffer: Buffer.from('b') }),
-      ];
+    const CorrectFiles = [
+      createUnitTestFile({ originalname: 'test1.jpg' }),
+      createUnitTestFile({ originalname: 'test2.jpg' }),
+      createUnitTestFile({ originalname: 'test3.jpg' }),
+      createUnitTestFile({ originalname: 'test4.jpg' }),
+    ];
 
-      const urls = [
-        'https://example.com/test1.jpg',
-        'https://example.com/test2.jpg',
-      ];
+    const IncorrectFiles = [
+      {
+        file: createUnitTestFile({ originalname: 'test5.jpg' }),
+        error: CLOUDINARY_ERRORS.UPLOAD_FAILED,
+      },
+      {
+        file: createUnitTestFile({ originalname: 'test6.jpg' }),
+        error: CLOUDINARY_ERRORS.NO_SECURE_URL,
+      },
+    ];
 
-      mockCloudinary.uploader.upload_stream = CreateUploadStreamMock({
-        Urls: urls,
-        MultipleUploads: true,
+    const MixedFiles = [
+      ...CorrectFiles,
+      ...IncorrectFiles.map(({ file }) => file),
+    ];
+
+    test('should upload all correct files', async () => {
+      const uploadSpy = jest.spyOn(service, 'upload');
+      mockFilesUpload(CorrectFiles, []);
+
+      const { successes, failures } = await service.uploadMany(CorrectFiles);
+
+      expect(failures).toHaveLength(0);
+      expect(successes).toHaveLength(CorrectFiles.length);
+      expect(uploadSpy).toHaveBeenCalledTimes(CorrectFiles.length);
+
+      expectUploadSuccesses(successes, CorrectFiles);
+    });
+
+    test('should correctly classify files into successes and failures', async () => {
+      const uploadSpy = jest.spyOn(service, 'upload');
+      mockFilesUpload(CorrectFiles, IncorrectFiles);
+
+      const { successes, failures } = await service.uploadMany(MixedFiles);
+
+      expect(successes).toHaveLength(CorrectFiles.length);
+      expect(failures).toHaveLength(IncorrectFiles.length);
+      expect(uploadSpy).toHaveBeenCalledTimes(MixedFiles.length);
+
+      expectUploadSuccesses(successes, CorrectFiles);
+      expectUploadFailures(failures, IncorrectFiles);
+    });
+
+    test('should handle an empty array of files without throwing errors', async () => {
+      const { successes, failures } = await service.uploadMany([]);
+
+      expect(successes).toHaveLength(0);
+      expect(failures).toHaveLength(0);
+      expect(mockCloudinary.uploader.upload_stream).not.toHaveBeenCalled();
+    });
+
+    test('should call upload exactly once per file', async () => {
+      const uploadSpy = jest
+        .spyOn(service, 'upload')
+        .mockResolvedValue('https://url.com');
+      await service.uploadMany(CorrectFiles);
+
+      expect(uploadSpy).toHaveBeenCalledTimes(CorrectFiles.length);
+      CorrectFiles.forEach((file, index) => {
+        expect(uploadSpy).toHaveBeenNthCalledWith(index + 1, file);
       });
-
-      const result = await service.uploadMany(files);
-
-      expect(result).toEqual(urls);
-      expect(mockCloudinary.uploader.upload_stream).toHaveBeenCalled();
     });
 
-    it('should throw if one of the uploads fail', async () => {
-      const files = [
-        createUnitTestFile({ filename: 'test1.jpg', buffer: Buffer.from('a') }),
-        createUnitTestFile({ filename: 'test2.jpg', buffer: Buffer.from('b') }),
-      ];
+    it('should cover the catch block and error mapping in uploadMany', async () => {
+      const file1 = createUnitTestFile({ originalname: 'error1.jpg' });
+      jest
+        .spyOn(service, 'upload')
+        .mockRejectedValueOnce(new Error('Custom Error'));
 
-      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
-        CreateUploadStreamMock({
-          secureUrl: 'https://example.com/test1.jpg',
-        }),
-      );
+      const file2 = createUnitTestFile({ originalname: 'error2.jpg' });
+      jest.spyOn(service, 'upload').mockRejectedValueOnce('String Error');
 
-      mockCloudinary.uploader.upload_stream.mockImplementationOnce(
-        CreateUploadStreamMock({
-          ErrorOnUpload: true,
-        }),
-      );
+      const { failures } = await service.uploadMany([file1, file2]);
 
-      const uploadPromise = service.uploadMany(files);
-
-      await expect(uploadPromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
-    });
-
-    it('should return empty array when no files are provided', async () => {
-      const result = await service.uploadMany([]);
-      expect(result).toEqual([]);
+      expect(failures[0].error).toBe('Custom Error');
+      expect(failures[1].error).toBe(CLOUDINARY_ERRORS.UPLOAD_FAILED);
     });
   });
 
   describe('delete', () => {
-    const publicIds = 'public_id';
+    const publicId = 'public_id';
 
-    it("Shoould call cloudinary's destroy method", async () => {
-      const publicId = publicIds;
+    it('should throw an error if no publicId is provided', async () => {
+      const deletePromise = service.delete('');
+
+      await expect(deletePromise).rejects.toThrow(
+        CLOUDINARY_ERRORS.DELETE_FAILED,
+      );
+    });
+
+    it('should call cloudinary destroy with the correct ID and resolve on success', async () => {
       await service.delete(publicId);
 
-      expect(mockCloudinary.uploader.destroy).toHaveBeenCalledWith(publicId);
+      expect(mockCloudinary.uploader.destroy.mock.calls[0][0]).toBe(publicId);
       expect(mockCloudinary.uploader.destroy).toHaveBeenCalledTimes(1);
     });
 
-    it('Should throw if cloudinary destroy fails', async () => {
-      mockCloudinary.uploader.destroy.mockRejectedValueOnce(
-        new Error(CLOUDINARY_ERRORS.TEST_ERROR),
+    it('should reject with DELETE_FAILED if cloudinary destroy fails', async () => {
+      mockCloudinary.uploader.destroy.mockImplementationOnce(
+        (id: string, callback: (err: any, res: any) => void) => {
+          callback(new Error('Cloudinary Error'), null);
+        },
       );
 
-      const deletePromise = service.delete(publicIds);
+      const deletePromise = service.delete(publicId);
 
-      await expect(deletePromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
+      await expect(deletePromise).rejects.toThrow(
+        CLOUDINARY_ERRORS.DELETE_FAILED,
+      );
+      expect(mockCloudinary.uploader.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should reject with DELETE_FAILED if result.result is not "ok"', async () => {
+      mockCloudinary.uploader.destroy.mockImplementationOnce(
+        (id: string, callback: (err: any, res: any) => void) => {
+          callback(null, { result: 'not_found' });
+        },
+      );
+
+      const deletePromise = service.delete(publicId);
+
+      await expect(deletePromise).rejects.toThrow(
+        CLOUDINARY_ERRORS.DELETE_FAILED,
+      );
     });
   });
 
   describe('deleteMany', () => {
-    const publicIds = ['public_id1', 'public_id2', 'public_id3'];
+    const VALID_IDS = ['id_success_1', 'id_success_2'];
+    const FAILED_IDS = ['id_fail_not_found', 'id_fail_missing'];
+    const MIXED_IDS = [...VALID_IDS, ...FAILED_IDS];
 
-    it("Should call cloudinary's destroy method for each publicId", async () => {
-      await service.deleteMany(publicIds);
+    const CUSTOM_STATUSES_MOCK = {
+      [VALID_IDS[0]]: 'deleted',
+      [VALID_IDS[1]]: 'ok',
+      [FAILED_IDS[0]]: 'not_found',
+      [FAILED_IDS[1]]: '',
+    };
 
-      expect(mockCloudinary.uploader.destroy).toHaveBeenCalledTimes(
-        publicIds.length,
-      );
+    it('should return empty successes and failures if publicIds array is empty', async () => {
+      const { successes, failures } = await service.deleteMany([]);
 
-      for (const id of publicIds) {
-        expect(mockCloudinary.uploader.destroy).toHaveBeenCalledWith(id);
-      }
+      expect(successes).toHaveLength(0);
+      expect(failures).toHaveLength(0);
+      expect(mockCloudinary.api.delete_resources).not.toHaveBeenCalled();
     });
 
-    it('Should throw if one of the cloudinary destroy calls fails', async () => {
-      mockCloudinary.uploader.destroy.mockRejectedValueOnce(
-        new Error(CLOUDINARY_ERRORS.TEST_ERROR),
-      );
+    it('should correctly map a mixed response of successes and failures', async () => {
+      mockCloudinary.api.delete_resources = CreateDeleteResourcesMock({
+        customStatuses: CUSTOM_STATUSES_MOCK,
+        defaultStatus: 'ok',
+      });
 
-      const deletePromise = service.deleteMany(publicIds);
+      const { successes, failures } = await service.deleteMany(MIXED_IDS);
 
-      await expect(deletePromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
+      expect(successes).toHaveLength(VALID_IDS.length);
+      expect(failures).toHaveLength(FAILED_IDS.length);
+
+      expect(successes).toEqual([
+        { publicId: VALID_IDS[0] },
+        { publicId: VALID_IDS[1] },
+      ]);
+      expect(failures).toEqual([
+        { publicId: FAILED_IDS[0], error: 'not_found' },
+        { publicId: FAILED_IDS[1], error: 'not_found' },
+      ]);
     });
 
-    it('should return immediately if publicIds is empty', async () => {
-      const result = await service.deleteMany([]);
+    it('should throw DELETE_FAILED if the cloudinary api call fails', async () => {
+      mockCloudinary.api.delete_resources = CreateDeleteResourcesMock({
+        errorOnDelete: true,
+      });
 
-      expect(mockCloudinary.uploader.destroy).not.toHaveBeenCalled();
+      const deleteManyPromise = service.deleteMany(MIXED_IDS);
 
-      expect(result).toBeUndefined();
+      await expect(deleteManyPromise).rejects.toThrow(
+        CLOUDINARY_ERRORS.DELETE_FAILED,
+      );
     });
   });
 
   describe('getPublicUrl', () => {
-    const publicId = 'public_id';
+    it('should return a secure URL for a given publicId', async () => {
+      const publicId = 'test_id';
+      const expectedUrl =
+        'https://res.cloudinary.com/demo/image/upload/test_id';
 
-    it('should return the public url', async () => {
-      mockCloudinary.url.mockImplementationOnce(
-        (id) => `https://example.com/${id}`,
-      );
+      mockCloudinary.url.mockReturnValue(expectedUrl);
 
       const result = await service.getPublicUrl(publicId);
 
-      expect(result).toEqual(`https://example.com/${publicId}`);
+      expect(result).toBe(expectedUrl);
+      expect(mockCloudinary.url).toHaveBeenCalledWith(publicId, {
+        secure: true,
+      });
     });
 
-    it('should throw if cloudinary url fails', async () => {
-      mockCloudinary.url.mockImplementationOnce(() => {
-        throw new Error(CLOUDINARY_ERRORS.TEST_ERROR);
-      });
+    it('should throw GET_URL_FAILED if publicId is not provided', async () => {
+      await expect(service.getPublicUrl('')).rejects.toThrow(
+        CLOUDINARY_ERRORS.GET_URL_FAILED,
+      );
+    });
 
-      const getPublicUrlPromise = service.getPublicUrl(publicId);
+    it('should throw GET_URL_FAILED if cloudinary returns an empty string', async () => {
+      mockCloudinary.url.mockReturnValue('');
 
-      await expect(getPublicUrlPromise).rejects.toThrow(
-        CLOUDINARY_ERRORS.TEST_ERROR,
+      await expect(service.getPublicUrl('any_id')).rejects.toThrow(
+        CLOUDINARY_ERRORS.GET_URL_FAILED,
       );
     });
   });
 
   describe('getPublicUrlsMany', () => {
-    const publicIds = ['public_id1', 'public_id2', 'public_id3'];
+    const VALID_IDS = ['id_1', 'id_2'];
+    const INVALID_IDS = ['', 'id_error'];
 
-    it('should return the public urls', async () => {
-      mockCloudinary.url.mockImplementation(
-        (id) => `https://example.com/${id}`,
-      );
+    const ALL_IDS = [...VALID_IDS, ...INVALID_IDS];
 
-      const result = await service.getPublicUrlsMany(publicIds);
+    it('should return empty successes and failures when input array is empty', async () => {
+      const { successes, failures } = await service.getPublicUrlsMany([]);
 
-      expect(result).toEqual(
-        publicIds.map((id) => `https://example.com/${id}`),
-      );
+      expect(successes).toHaveLength(0);
+      expect(failures).toHaveLength(0);
+      expect(mockCloudinary.url).not.toHaveBeenCalled();
     });
 
-    it('should throw if cloudinary url fails', async () => {
-      mockCloudinary.url.mockImplementation(() => {
-        throw new Error(CLOUDINARY_ERRORS.TEST_ERROR);
+    it('should correctly classify secure URLs and generation failures', async () => {
+      const HTTP_PREFIX = 'https://res.cloudinary.com/secure/';
+
+      mockCloudinary.url.mockImplementation((id: string) => {
+        if (id === 'id_error' || !id) return '';
+
+        return `${HTTP_PREFIX}${id}`;
       });
 
-      const getPublicUrlsManyPromise = service.getPublicUrlsMany(publicIds);
+      const { successes, failures } = await service.getPublicUrlsMany(ALL_IDS);
 
-      await expect(getPublicUrlsManyPromise).rejects.toThrow(
-        CLOUDINARY_ERRORS.TEST_ERROR,
-      );
+      expect(successes).toEqual([
+        { publicId: VALID_IDS[0], url: `${HTTP_PREFIX}${VALID_IDS[0]}` },
+        { publicId: VALID_IDS[1], url: `${HTTP_PREFIX}${VALID_IDS[1]}` },
+      ]);
+
+      expect(failures).toHaveLength(INVALID_IDS.length);
+      expect(failures).toEqual([
+        { publicId: INVALID_IDS[0], error: CLOUDINARY_ERRORS.GET_URL_FAILED },
+        { publicId: INVALID_IDS[1], error: CLOUDINARY_ERRORS.GET_URL_FAILED },
+      ]);
+
+      expect(mockCloudinary.url).toHaveBeenCalledWith(VALID_IDS[0], {
+        secure: true,
+      });
+    });
+
+    it('should maintain strict security by passing secure: true to all calls', async () => {
+      mockCloudinary.url.mockReturnValue('https://any-url.com');
+
+      await service.getPublicUrlsMany(['id_test']);
+
+      expect(mockCloudinary.url).toHaveBeenCalledWith('id_test', {
+        secure: true,
+      });
     });
   });
 });

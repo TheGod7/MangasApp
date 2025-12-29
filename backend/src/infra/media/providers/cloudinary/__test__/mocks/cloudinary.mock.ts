@@ -1,14 +1,10 @@
 import { Writable } from 'stream';
+import {
+  CloudinaryAdminDeleteResponse,
+  CreateDeleteResourcesMockOptions,
+  CreateUploadStreamMockOptions,
+} from '../../types/cloudinary.types';
 import { CLOUDINARY_ERRORS } from '../../constants/cloudinary.errors';
-
-interface CreateUploadStreamMockOptions {
-  secureUrl?: string | null;
-  Urls?: string[];
-
-  MultipleUploads?: boolean;
-  ErrorOnpipe?: boolean;
-  ErrorOnUpload?: boolean;
-}
 
 const CreateUploadStreamMock = (options: CreateUploadStreamMockOptions) => {
   let callIndex = 0;
@@ -23,7 +19,7 @@ const CreateUploadStreamMock = (options: CreateUploadStreamMockOptions) => {
       const writable = new Writable({
         write(_chunk, _encoding, done) {
           if (options.ErrorOnUpload) {
-            cloudinaryCallback(new Error(CLOUDINARY_ERRORS.TEST_ERROR), null);
+            cloudinaryCallback(new Error(), null);
           }
 
           if (
@@ -72,14 +68,43 @@ const CreateUploadStreamMock = (options: CreateUploadStreamMockOptions) => {
   );
 };
 
+const CreateDeleteResourcesMock = (
+  options: CreateDeleteResourcesMockOptions = {},
+) => {
+  return jest.fn(
+    (publicIds: string[]): Promise<CloudinaryAdminDeleteResponse> => {
+      if (options.errorOnDelete) {
+        return Promise.reject(new Error(CLOUDINARY_ERRORS.DELETE_FAILED));
+      }
+
+      const defaultStatus = options.defaultStatus ?? 'deleted';
+
+      const deleted = publicIds.reduce((acc, id) => {
+        const status = options.customStatuses?.[id] ?? defaultStatus;
+        return { ...acc, [id]: status };
+      }, {});
+
+      return Promise.resolve({
+        deleted,
+        partial: false,
+      });
+    },
+  );
+};
+
 const mockCloudinary = {
   uploader: {
     upload_stream: CreateUploadStreamMock({
       secureUrl: 'https://example.com/image.jpg',
     }),
-    destroy: jest.fn(),
+    destroy: jest.fn((_id, callback: (err: any, result: any) => void) => {
+      callback(null, { result: 'ok' });
+    }),
+  },
+  api: {
+    delete_resources: CreateDeleteResourcesMock(),
   },
   url: jest.fn(),
 };
 
-export { mockCloudinary, CreateUploadStreamMock };
+export { mockCloudinary, CreateUploadStreamMock, CreateDeleteResourcesMock };

@@ -1,6 +1,9 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { MEDIA_SERVICE, MEDIA_PROVIDER_DEFAULT } from './media.constants';
 import { MediaModuleType, MediaServiceType } from './types/media.types';
+import { MulterModule } from '@nestjs/platform-express';
+import { mediaConfig } from './media.config';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [],
@@ -26,7 +29,11 @@ export class MediaModule {
 
     return {
       module: MediaModule,
-      imports: [moduleClass],
+      imports: [
+        moduleClass,
+        ConfigModule.forFeature(mediaConfig),
+        MulterModule.registerAsync(mediaConfig.asProvider()),
+      ],
       providers: [
         {
           provide: MEDIA_SERVICE,

@@ -1,6 +1,7 @@
 export interface UploadSuccess {
   fileName: string;
   url: string;
+  publicId: string;
 }
 
 export interface UploadFailure {
@@ -43,9 +44,9 @@ export interface GetUrlsManyResult {
 }
 
 export abstract class MediaService {
-  abstract upload(file: Express.Multer.File): Promise<string>;
+  abstract upload(file: Express.Multer.File): Promise<UploadSuccess>;
   abstract delete(publicId: string): Promise<void>;
-  abstract getPublicUrl(publicId: string): Promise<string>;
+  abstract getPublicUrl(publicId: string): Promise<GetUrlSuccess>;
 
   abstract getPublicUrlsMany(publicIds: string[]): Promise<GetUrlsManyResult>;
 

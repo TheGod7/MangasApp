@@ -36,9 +36,11 @@ export class CloudinaryService implements MediaService {
           if (error || !result) {
             return reject(new Error(CLOUDINARY_ERRORS.UPLOAD_FAILED));
           }
+
           if (!result.secure_url) {
             return reject(new Error(CLOUDINARY_ERRORS.NO_SECURE_URL));
           }
+
           resolve({
             fileName: file.originalname,
             url: result.secure_url,
@@ -46,8 +48,13 @@ export class CloudinaryService implements MediaService {
           });
         },
       );
+      const readable = Readable.from(file.buffer);
 
-      Readable.from(file.buffer).pipe(uploadStream);
+      readable.on('error', () => {
+        reject(new Error(CLOUDINARY_ERRORS.UPLOAD_FAILED));
+      });
+
+      readable.pipe(uploadStream);
     });
   }
 

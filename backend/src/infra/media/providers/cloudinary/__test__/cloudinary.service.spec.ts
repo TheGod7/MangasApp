@@ -157,6 +157,7 @@ describe('CloudinaryService', () => {
       await service.delete(publicId);
 
       expect(mockCloudinary.uploader.destroy).toHaveBeenCalledWith(publicId);
+      expect(mockCloudinary.uploader.destroy).toHaveBeenCalledTimes(1);
     });
 
     it('Should throw if cloudinary destroy fails', async () => {
@@ -167,6 +168,40 @@ describe('CloudinaryService', () => {
       const deletePromise = service.delete(publicIds);
 
       await expect(deletePromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
+    });
+  });
+
+  describe('deleteMany', () => {
+    const publicIds = ['public_id1', 'public_id2', 'public_id3'];
+
+    it("Should call cloudinary's destroy method for each publicId", async () => {
+      await service.deleteMany(publicIds);
+
+      expect(mockCloudinary.uploader.destroy).toHaveBeenCalledTimes(
+        publicIds.length,
+      );
+
+      for (const id of publicIds) {
+        expect(mockCloudinary.uploader.destroy).toHaveBeenCalledWith(id);
+      }
+    });
+
+    it('Should throw if one of the cloudinary destroy calls fails', async () => {
+      mockCloudinary.uploader.destroy.mockRejectedValueOnce(
+        new Error(CLOUDINARY_ERRORS.TEST_ERROR),
+      );
+
+      const deletePromise = service.deleteMany(publicIds);
+
+      await expect(deletePromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
+    });
+
+    it('should return immediately if publicIds is empty', async () => {
+      const result = await service.deleteMany([]);
+
+      expect(mockCloudinary.uploader.destroy).not.toHaveBeenCalled();
+
+      expect(result).toBeUndefined();
     });
   });
 });

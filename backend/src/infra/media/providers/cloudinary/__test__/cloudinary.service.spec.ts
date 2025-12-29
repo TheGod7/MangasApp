@@ -204,4 +204,30 @@ describe('CloudinaryService', () => {
       expect(result).toBeUndefined();
     });
   });
+
+  describe('getPublicUrl', () => {
+    const publicId = 'public_id';
+
+    it('should return the public url', async () => {
+      mockCloudinary.url.mockImplementationOnce(
+        (id) => `https://example.com/${id}`,
+      );
+
+      const result = await service.getPublicUrl(publicId);
+
+      expect(result).toEqual(`https://example.com/${publicId}`);
+    });
+
+    it('should throw if cloudinary url fails', async () => {
+      mockCloudinary.url.mockImplementationOnce(() => {
+        throw new Error(CLOUDINARY_ERRORS.TEST_ERROR);
+      });
+
+      const getPublicUrlPromise = service.getPublicUrl(publicId);
+
+      await expect(getPublicUrlPromise).rejects.toThrow(
+        CLOUDINARY_ERRORS.TEST_ERROR,
+      );
+    });
+  });
 });

@@ -148,4 +148,25 @@ describe('CloudinaryService', () => {
       expect(result).toEqual([]);
     });
   });
+
+  describe('delete', () => {
+    const publicIds = 'public_id';
+
+    it("Shoould call cloudinary's destroy method", async () => {
+      const publicId = publicIds;
+      await service.delete(publicId);
+
+      expect(mockCloudinary.uploader.destroy).toHaveBeenCalledWith(publicId);
+    });
+
+    it('Should throw if cloudinary destroy fails', async () => {
+      mockCloudinary.uploader.destroy.mockRejectedValueOnce(
+        new Error(CLOUDINARY_ERRORS.TEST_ERROR),
+      );
+
+      const deletePromise = service.delete(publicIds);
+
+      await expect(deletePromise).rejects.toThrow(CLOUDINARY_ERRORS.TEST_ERROR);
+    });
+  });
 });

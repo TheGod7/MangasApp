@@ -18,6 +18,12 @@ interface CreateUploadStreamMockOptions {
   ErrorOnUpload?: boolean;
 }
 
+interface CloudinaryResource {
+  public_id: string;
+  secure_url: string;
+  [key: string]: any;
+}
+
 interface CreateDeleteResourcesMockOptions {
   customStatuses?: Record<string, string>;
   errorOnDelete?: boolean;
@@ -29,4 +35,5 @@ export type {
   CloudinaryAdminDeleteResponse,
   CreateUploadStreamMockOptions,
   CreateDeleteResourcesMockOptions,
+  CloudinaryResource,
 };

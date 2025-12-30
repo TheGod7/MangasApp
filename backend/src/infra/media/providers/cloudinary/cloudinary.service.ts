@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/require-await */
 import { Inject, Injectable } from '@nestjs/common';
 import {
   DeleteManyResult,
@@ -15,6 +14,7 @@ import { CLOUDINARY_ERRORS } from './constants/cloudinary.errors';
 import {
   CloudinaryAdminDeleteResponse,
   CloudinaryDestroyResponse,
+  CloudinaryResource,
 } from './types/cloudinary.types';
 
 @Injectable()
@@ -125,37 +125,45 @@ export class CloudinaryService implements MediaService {
   async getPublicUrl(publicId: string): Promise<GetUrlSuccess> {
     if (!publicId) throw new Error(CLOUDINARY_ERRORS.GET_URL_FAILED);
 
-    const url = this.cloudinary.url(publicId, { secure: true });
+    try {
+      const resource = (await this.cloudinary.api.resource(
+        publicId,
+      )) as CloudinaryResource;
 
-    if (!url) throw new Error(CLOUDINARY_ERRORS.GET_URL_FAILED);
+      if (
+        !resource.secure_url ||
+        !resource.public_id ||
+        resource.public_id !== publicId
+      ) {
+        throw new Error(CLOUDINARY_ERRORS.GET_URL_FAILED);
+      }
 
-    return { publicId, url };
+      return {
+        publicId: resource.public_id,
+        url: resource.secure_url,
+      };
+    } catch {
+      throw new Error(CLOUDINARY_ERRORS.GET_URL_FAILED);
+    }
   }
 
   async getPublicUrlsMany(publicIds: string[]): Promise<GetUrlsManyResult> {
-    const successes: { publicId: string; url: string }[] = [];
-    const failures: { publicId: string; error: string }[] = [];
+    const successes: GetUrlsManyResult['successes'] = [];
+    const failures: GetUrlsManyResult['failures'] = [];
 
-    publicIds.forEach((id) => {
-      if (!id) {
+    const promises = publicIds.map(async (id) => {
+      try {
+        const result = await this.getPublicUrl(id);
+        successes.push(result);
+      } catch {
         failures.push({
           publicId: id,
           error: CLOUDINARY_ERRORS.GET_URL_FAILED,
         });
-        return;
-      }
-
-      const url = this.cloudinary.url(id, { secure: true });
-
-      if (!url) {
-        failures.push({
-          publicId: id,
-          error: CLOUDINARY_ERRORS.GET_URL_FAILED,
-        });
-      } else {
-        successes.push({ publicId: id, url });
       }
     });
+
+    await Promise.allSettled(promises);
 
     return { successes, failures };
   }

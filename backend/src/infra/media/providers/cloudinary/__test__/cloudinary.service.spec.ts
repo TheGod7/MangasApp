@@ -333,7 +333,12 @@ describe('CloudinaryService', () => {
       const publicId = 'test_id';
       const secureUrl = URL_PREFIX + publicId;
 
-      mockCloudinary.url.mockReturnValueOnce(secureUrl);
+      mockCloudinary.api.resource.mockReturnValueOnce(
+        Promise.resolve({
+          secure_url: secureUrl,
+          public_id: publicId,
+        }),
+      );
 
       const result = await service.getPublicUrl(publicId);
 
@@ -342,9 +347,7 @@ describe('CloudinaryService', () => {
         url: secureUrl,
       });
 
-      expect(mockCloudinary.url).toHaveBeenCalledWith(publicId, {
-        secure: true,
-      });
+      expect(mockCloudinary.api.resource).toHaveBeenCalledWith(publicId);
     });
 
     it('should throw GET_URL_FAILED if publicId is empty', async () => {
@@ -354,7 +357,9 @@ describe('CloudinaryService', () => {
     });
 
     it('should throw GET_URL_FAILED if cloudinary returns empty string', async () => {
-      mockCloudinary.url.mockReturnValueOnce('');
+      mockCloudinary.api.resource.mockReturnValueOnce(
+        Promise.resolve({ secure_url: '', public_id: 'any_id' }),
+      );
 
       await expect(service.getPublicUrl('any_id')).rejects.toThrow(
         CLOUDINARY_ERRORS.GET_URL_FAILED,
@@ -362,7 +367,9 @@ describe('CloudinaryService', () => {
     });
 
     it('should throw GET_URL_FAILED if cloudinary returns undefined', async () => {
-      mockCloudinary.url.mockReturnValueOnce(undefined);
+      mockCloudinary.api.resource.mockReturnValueOnce(
+        Promise.reject(new Error()),
+      );
 
       await expect(service.getPublicUrl('any_id')).rejects.toThrow(
         CLOUDINARY_ERRORS.GET_URL_FAILED,
@@ -383,10 +390,15 @@ describe('CloudinaryService', () => {
     });
 
     it('should classify valid, empty and failing ids correctly', async () => {
-      mockCloudinary.url.mockImplementation((id: string) => {
-        if (!id) return '';
-        if (id === 'id_undefined') return undefined;
-        return URL_PREFIX + id;
+      mockCloudinary.api.resource.mockImplementation((id: string) => {
+        if (!id || id === 'id_undefined') {
+          return Promise.reject(new Error('Resource not found'));
+        }
+
+        return Promise.resolve({
+          secure_url: URL_PREFIX + id,
+          public_id: id,
+        });
       });
 
       const { successes, failures } = await service.getPublicUrlsMany([
@@ -408,11 +420,16 @@ describe('CloudinaryService', () => {
     });
 
     it('should always call cloudinary.url with secure true', async () => {
-      mockCloudinary.url.mockReturnValue(URL_PREFIX + 'x');
+      mockCloudinary.api.resource.mockReturnValue(
+        Promise.resolve({
+          secure_url: URL_PREFIX + 'x',
+          public_id: 'x',
+        }),
+      );
 
       await service.getPublicUrlsMany(['x']);
 
-      expect(mockCloudinary.url).toHaveBeenCalledWith('x', { secure: true });
+      expect(mockCloudinary.api.resource).toHaveBeenCalledWith('x');
     });
   });
 });

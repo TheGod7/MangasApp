@@ -28,7 +28,7 @@ export class CloudinaryService implements MediaService {
       }
 
       const uploadStream = this.cloudinary.uploader.upload_stream(
-        { resource_type: 'auto' },
+        { resource_type: 'image' },
         (
           error: UploadApiErrorResponse | undefined,
           result: UploadApiResponse | undefined,

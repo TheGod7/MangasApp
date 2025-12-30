@@ -10,11 +10,15 @@
     "start:dev": "cross-env NODE_ENV=development nest start --watch",
     "start:debug": "cross-env NODE_ENV=development nest start --debug --watch",
     "start:prod": "cross-env NODE_ENV=production node dist/main",
-    "test": "cross-env NODE_ENV=test jest",
-    "test:watch": "cross-env NODE_ENV=test jest --watch",
-    "test:cov": "cross-env NODE_ENV=test jest --coverage",
-    "test:debug": "cross-env NODE_ENV=test node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "cross-env NODE_ENV=test jest --config ./test/jest-e2e.json"
+    "test": "cross-env NODE_ENV=test jest --config jest.unit.config.ts",
+    "test:cov": "cross-env NODE_ENV=test jest --config jest.unit.config.ts --coverage",
+    "test:unit": "cross-env NODE_ENV=test jest --config jest.unit.config.ts",
+    "test:unit:watch": "cross-env NODE_ENV=test jest --config jest.unit.config.ts --watch",
+    "test:unit:debug": "cross-env NODE_ENV=test node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --config jest.unit.config.ts --runInBand",
+    "test:integration": "cross-env NODE_ENV=test jest --config jest.integration.config.ts",
+    "test:integration:watch": "cross-env NODE_ENV=test jest --config jest.integration.config.ts --watch",
+    "test:e2e": "cross-env NODE_ENV=test jest --config ./test/jest-e2e.json",
+    "test:e2e:watch": "cross-env NODE_ENV=test jest --config ./test/jest-e2e.json --watch"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

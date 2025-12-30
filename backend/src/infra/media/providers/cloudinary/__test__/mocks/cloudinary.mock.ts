@@ -96,8 +96,13 @@ const mockCloudinary = {
   },
   api: {
     delete_resources: CreateDeleteResourcesMock(),
+    resource: jest.fn((publicId: string) => {
+      return Promise.resolve({
+        public_id: publicId,
+        secure_url: URL_PREFIX + publicId + JPG_EXT,
+      });
+    }),
   },
-  url: jest.fn(),
 };
 
 export { mockCloudinary, CreateUploadStreamMock, CreateDeleteResourcesMock };

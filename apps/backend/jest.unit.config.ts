@@ -1,13 +1,15 @@
-// jest.unit.config.ts
-import type { JestConfigWithTsJest } from 'ts-jest';
+import type { Config } from 'jest';
 
-const config: JestConfigWithTsJest = {
+const config: Config = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: 'src',
   testRegex: '^(?!.*\\.integration\\.spec\\.ts$).*\\.spec\\.ts$',
+  testEnvironment: 'node',
+
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    '^.+\\.(t|j)s$': '@swc/jest',
   },
+
   collectCoverageFrom: [
     '**/*.ts',
     '!**/*.spec.ts',
@@ -21,8 +23,9 @@ const config: JestConfigWithTsJest = {
     '!**/*.errors.ts',
     '!main.ts',
   ],
+
   coverageDirectory: '../coverage/unit',
-  testEnvironment: 'node',
+
   moduleNameMapper: {
     '^@media/(.*)$': '<rootDir>/infra/media/$1',
     '^@/(.*)$': '<rootDir>/$1',

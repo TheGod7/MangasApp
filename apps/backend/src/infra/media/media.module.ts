@@ -13,11 +13,11 @@ export class MediaModule {
     const name = process.env.MEDIA_PROVIDER || MEDIA_PROVIDER_DEFAULT;
 
     const moduleImport = (await import(
-      `./providers/${name}/${name}.module.js`
+      `./providers/${name}/${name}.module`
     )) as Record<string, MediaModuleType>;
 
     const serviceImport = (await import(
-      `./providers/${name}/${name}.service.js`
+      `./providers/${name}/${name}.service`
     )) as Record<string, MediaServiceType>;
 
     const moduleClass = Object.values(moduleImport)[0];

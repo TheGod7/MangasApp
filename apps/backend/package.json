@@ -11,7 +11,7 @@
     "start:debug": "cross-env NODE_ENV=development nest start --builder swc --debug --watch",
     "start:prod": "cross-env NODE_ENV=production node dist/main",
     "test": "cross-env NODE_ENV=test jest --config jest.unit.config.ts",
-    "test:cov": "cross-env NODE_ENV=test jest --config jest.unit.config.ts --coverage",
+    "test:cov": "cross-env NODE_ENV=test COVERAGE=true jest --config jest.unit.config.ts --coverage",
     "test:unit": "cross-env NODE_ENV=test jest --config jest.unit.config.ts",
     "test:unit:watch": "cross-env NODE_ENV=test jest --config jest.unit.config.ts --watch",
     "test:unit:debug": "cross-env NODE_ENV=test node --inspect-brk node_modules/.bin/jest --config jest.unit.config.ts --runInBand",

@@ -7,7 +7,7 @@ const config: Config = {
   testEnvironment: 'node',
 
   transform: {
-    '^.+\\.(t|j)s$': '@swc/jest',
+    '^.+\\.(t|j)s$': process.env.COVERAGE ? 'ts-jest' : '@swc/jest',
   },
 
   collectCoverageFrom: [
@@ -21,6 +21,7 @@ const config: Config = {
     '!**/*.config.ts',
     '!**/*.constants.ts',
     '!**/*.errors.ts',
+    '!**/*.types.ts',
     '!main.ts',
   ],
 
